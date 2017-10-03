@@ -1,0 +1,4 @@
+This project tries to achieve the following goals:
+1) download option metrics data from WRDS. To run this a Rstudio environment that is already setup for WRDS connections is needed
+2) Then option data is then merged with CRSP and Compustat for the underlying 
+3) Basic machine learning exercise on using CRSP price history and option history to predict weekly/monthly return
