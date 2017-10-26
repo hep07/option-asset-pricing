@@ -1,0 +1,32 @@
+# created by Pu He @cbs
+# last modified 10/25/2017
+
+mkdir ./imp_alpha_results
+
+years=($(seq $1 $2))
+months=($(seq $3 $4))
+
+
+
+# tested and run in no machine using the command: sge_run --grid_mem=15g "./bash_R_thread_cal_imp_alpha 2013 2013 8 10"   
+
+chmod +x implied_rough.R
+dos2unix implied_rough.R
+
+
+for year in `seq $1 $2`; do
+	
+	for month in `seq $3 $4`; do		
+
+			
+		
+	 	sge_run --grid_mem=15G --grid_submit=batch "./implied_rough.R $year $month"			
+			
+		
+
+			
+			
+		
+	done
+done
+
