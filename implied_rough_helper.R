@@ -22,12 +22,22 @@ ATMskew_term_structure_spline <- function(logKS,imp_vol, threshold) {
   if (length(logKS)>threshold) {
     #print(length(logKS))
     #print(logKS)
-    spline_res <- smooth.spline(x = logKS, y = imp_vol)
-    temp <- predict(spline_res,0, deriv = 1)
-    #res <- abs(temp$y[2] - temp$y[1])/2/delta_KS
-    #print(res)
-    return(abs(temp$y))
-    #return(res)  
+    
+    
+    
+    spline_res = tryCatch({
+      spline_res <- smooth.spline(x = logKS, y = imp_vol)
+    }, error = function(e) {
+      return(NULL)
+    })
+    
+    if (is.null(spline_res)) {
+      return(NA)
+    } else {
+      temp <- predict(spline_res,0, deriv = 1)
+      return(abs(temp$y))  
+    }
+    
   } else {
     return(NA)
   }
