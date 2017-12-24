@@ -124,7 +124,7 @@ ret_test <- mat_test$retadj_next
 xgb_train_ret <- xgb.DMatrix(data = as.matrix(X_mat_train)[!is.na(next_ret_train),], label = next_ret_train[!is.na(next_ret_train)])
 xgb_train_resid <- xgb.DMatrix(data = as.matrix(X_mat_train)[!is.na(next_resid_train),], label = next_resid_train[!is.na(next_resid_train)])
 
-xgb_param_list <- list(eta=0.1, max_depth = 6)
+xgb_param_list <- list(eta=0.15, max_depth = 6)
 
 xgb_mdl_ret <- xgb.cv(params=xgb_param_list, verbose = T, data = xgb_train_ret, nfold = 5, nrounds = 200, early_stopping_rounds = 20)
 xgb_mdl_resid <- xgb.cv(params=xgb_param_list, data = xgb_train_resid, nfold = 5, nrounds = 200, early_stopping_rounds = 20)
@@ -137,7 +137,8 @@ target_ret_xgb_pred <- predict(xgb_mdl_ret, newdata = as.matrix(X_mat_test))
 target_resid_xgb_pred <- predict(xgb_mdl_resid, newdata = as.matrix(X_mat_test))
 
 
-final_res <- mat_test %>% select(Date, PERMNO, target_ret_xgb_pred,target_resid_xgb_pred)
+final_res <- mat_test %>% mutate(target_ret_xgb_pred = target_ret_xgb_pred, target_resid_xgb_pred = target_resid_xgb_pred)
+  
 
 # save AI factor
 saveRDS(final_res,paste("./xgb_factor/", year_,"_",month_, sep=""))
