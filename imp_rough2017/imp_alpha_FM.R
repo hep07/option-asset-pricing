@@ -5,6 +5,9 @@ library(dplyr)
 library(tibble)
 library(moments)
 
+# test changing the files tracked by Git and also lie in the Dropbox folder
+
+
 ################################################################
 # load data needed
 ################################################################
@@ -13,6 +16,10 @@ skew_ts <- 3 # this is a >= threshold
 rsquare_threshold <- 0
 filtered <- 2
 month_threshold <- 15 # this is a >= threshold
+
+# today's date
+today_date <- as.integer(format(Sys.Date(), "%Y%m%d"))
+
 #imp_rough_df<- readRDS("./imp_rough_res/skew_5_skew_ts_2345_daily/imp_rough_results_filtered_threshold3.rds")
 # imp_rough_df_nonfiltered <- readRDS("./imp_rough_res/skew_5_skew_ts_2345_daily/imp_rough_df_filtered0_threshold3.rds")
 # imp_rough_df <- readRDS(paste("./imp_rough_combined_res/imp_rough_df_filtered",filtered,
@@ -45,8 +52,8 @@ daily_cs_optiondata_summary <- sapply(imp_rough_df %>% select(c( alpha, tot_opti
   c(res,res_2)
 })
 
-write.csv(daily_cs_optiondata_summary, paste("daily_cs_optiondata_summary171207_filtered_", filtered, "_skew_ts_", 
-skew_ts,".csv",sep=""))
+write.csv(daily_cs_optiondata_summary, paste("daily_cs_optiondata_summary_filtered_", filtered, "_skew_", skew_threshold, "_skew_ts_", 
+skew_ts,"_monththrehold_", month_threshold, "_rsqthreshold_", rsquare_threshold, "_", today_date, ".csv",sep=""))
 
 ################################################################
 # prepare for Fama-Macbeth
@@ -58,12 +65,15 @@ to_keep <- crsp_daily$date >= year(start_date) * 10000 + month(start_date) * 100
 crsp_daily <- crsp_daily[to_keep,]
 
 crsp_daily$date <- as.Date(as.character(crsp_daily$date), format = "%Y%m%d")
-crsp_daily_preprocessed <- crsp_daily %>% select(date, PERMNO, RET, SHROUT, VOL) %>% mutate(RET = as.numeric(as.character(RET)), year = year(date), month= month(date),
-                                                                                            SHROUT = as.numeric(SHROUT)/1000, VOL = as.numeric(VOL)/1000) 
+crsp_daily_preprocessed <- crsp_daily %>% select(date, PERMNO, PRC, RET, SHROUT, VOL) %>% mutate(RET = as.numeric(as.character(RET)), year = year(date), month= month(date),
+                                                                                            SHROUT = as.numeric(SHROUT), VOL = as.numeric(VOL),dVOL = VOL*abs(PRC)) 
+
+# add amihud measure of illiquidity
 crsp_daily_preprocessed <- crsp_daily_preprocessed %>%
   group_by(year, month, PERMNO) %>% summarise(ret_sigma = sd(RET,na.rm=T),
                                               ret_skew = skewness(RET, na.rm = T),
-                                              turnover = sum(VOL)/mean(SHROUT,na.rm=T)/1000) %>% ungroup()
+                                              turnover = sum(VOL)/mean(SHROUT,na.rm=T)/1000,
+                                              amihud_illiquid = mean(abs(RET)/dVOL,na.rm = T)) %>% ungroup()
 
 
 
@@ -127,8 +137,8 @@ df_processed <- df %>% group_by(year, month, PERMNO) %>% arrange(year,month,PERM
                                                   #XZZ_skew_surf = last(XZZ_skew_surf),
                                                   #imp_vol_slope = last(imp_vol_slope),
                                                   #ATMC_imp_vol = last(ATMC_imp_vol),
-                                                  tot_option_VOL = sum(tot_option_VOL),
-                                                  tot_open_interest = sum(tot_open_interest)) %>% 
+                                                  tot_option_VOL = mean(tot_option_VOL, na.rm = T),
+                                                  tot_open_interest = mean(tot_open_interest, na.rm = T)) %>% 
   ungroup()# %>% filter(!is.na(imp_alpha_last)) # only keep the one with imp_alpha estimate
 
 # merge further with calculated features from crsp daily data
@@ -199,11 +209,7 @@ good_matches <- readRDS("../related_data/sec_PERMNO_merged_good_match.rds")
 
 temp <- good_matches %>% filter(good_match_max_daily_diff_5)
 
-temp$PERMNO
-
-
-
-
+#temp$PERMNO
 df_final_complete2 <- df_final_complete %>% filter(PERMNO %in% temp$PERMNO)
 
 
@@ -219,10 +225,34 @@ H_panel_filtered <- H_panel_filtered %>% inner_join(temp %>% select(secid, PERMN
 df_final_complete3 <- H_panel_filtered %>% mutate(Date = year*100 + month) %>% select(Date, PERMNO, H_est) %>% 
   full_join(df_final_complete2,by = c("PERMNO"="PERMNO", "Date"="Date"))
 
-#df_final_complete <- df_final_complete %>% filter(yearmonth>= 200601)
 
 
-write.csv(df_final_complete3, "imp_rough_filtered_2_skew_ts_3_skew_4_month_threshold_15_rsquare0_realH2_1_171222.csv", row.names = F) # >=5,>=3, >=15
+summary_stats_df_final_complete3 <- sapply(df_final_complete3 %>% select(-c(yearmonth, PERMNO, Date)), function(x) {
+  res <- c(mean = mean(x, na.rm=T), sd = sd(x,na.rm=T))
+  res_2 <- sapply(c(0.05,0.25,0.5,0.75,0.95), function(q) quantile(x,q,na.rm=T))
+  names(res_2) <- paste("q_", c(0.05,0.25,0.5,0.75,0.95), sep="")
+  c(res,res_2)
+})
+
+
+write.csv(summary_stats_df_final_complete3, paste("summary_imprough_filtered_", filtered, "_skew_", skew_threshold, "_skew_ts_", 
+                                    skew_ts,"_monththrehold_", month_threshold, "_rsqthreshold_", rsquare_threshold, "_H_realized_imp_1_", today_date, ".csv",sep=""), 
+          row.names = F) # >=5,>=3, >=15
+
+cov_df_final_complete3 <- cor(df_final_complete3%>% select(-c(yearmonth, PERMNO, Date)), use = "pairwise.complete.obs")
+
+write.csv(cov_df_final_complete3, paste("cor_mat_imprough_filtered_", filtered, "_skew_", skew_threshold, "_skew_ts_", 
+                                                  skew_ts,"_monththrehold_", month_threshold, "_rsqthreshold_", rsquare_threshold, "_H_realized_imp_1_", today_date, ".csv",sep=""))
+
+write.csv(summary_stats_df_final_complete3, paste("summary_imprough_filtered_", filtered, "_skew_", skew_threshold, "_skew_ts_", 
+                                                  skew_ts,"_monththrehold_", month_threshold, "_rsqthreshold_", rsquare_threshold, "_H_realized_imp_1_", today_date, ".csv",sep=""), 
+          row.names = F) # >=5,>=3, >=15
+
+
+
+write.csv(df_final_complete3, paste("df_imprough_filtered_", filtered, "_skew_", skew_threshold, "_skew_ts_", 
+                                    skew_ts,"_monththrehold_", month_threshold, "_rsqthreshold_", rsquare_threshold, "_H_realized_imp_1_", today_date, ".csv",sep=""), 
+          row.names = F)
 
 # Run Fama-Macbeth regression as mean group 
 library(plm)
